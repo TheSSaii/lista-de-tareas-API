@@ -28,17 +28,29 @@ Formato: propósito · evidencia · validación · decisión.
 
 ## 2026-11-14 · Cierre del hueco de aprobación en Git y estado del bloque
 - **Propósito:** que `git commit`/`git push` no se ejecuten sin aprobación dentro de comandos
-  compuestos, y dejar constancia del estado de los 6 commits locales del bloque de auth.
+  compuestos, y dejar constancia del estado de los 6 commits del bloque de auth/tareas.
 - **Evidencia:** evaluación por segmentos (`&&`, `||`, `;`, `|`) y `PEDIR_PERMISO` en
   `.opencode/plugins/guard/politica.mjs`, rama `ask` en `.opencode/plugins/guard/index.ts`,
-  pruebas 17–20 de `ia/pruebas/politica.test.mjs` y `npm run check:ia` (20/20).
-  `git log` local: 6 commits; `git ls-remote origin refs/heads/main` devuelve `06800a8`.
+  pruebas 17–23 de `ia/pruebas/politica.test.mjs` y `npm run check:ia` (23/23).
+  En la revisión, `git log` local mostraba 6 commits y `git ls-remote` devolvía `06800a8`.
+  Después se publicaron `a4899ca` y `fd8a5e8` (política).
 - **Validación:** `git status && git commit` y `git add . && git push` devuelven `ask`;
   `git push --force` y `git reset --hard` encadenados siguen devolviendo `deny`; `git status`
   y `npm run check` siguen en `permitir`; un separador entre comillas
   (`echo "a; curl x"`) no parte el comando y `git commit -m "a; b"` sigue en `ask`.
 - **Decisión:** se pide permiso (`ask`), no se deniega; los `deny` de fuerza/reset se evalúan
-  antes. Los commits locales fueron autorizados por el humano; no se hizo push ni despliegue.
+  antes. Los commits del bloque fueron autorizados por el humano; en la revisión no se había
+  hecho push y después se publicó `a4899ca`. No hay despliegue registrado.
+
+## 2026-11-14 · Publicación del bloque de autenticación
+- **Propósito:** registrar el estado remoto después de la revisión.
+- **Evidencia:** `git ls-remote origin refs/heads/main` devuelve `a4899ca`; al momento de este
+  registro, `main` local está en `fd8a5e8` (política, sin publicar) y solo `ia/BITACORA.md`
+  queda modificado.
+- **Validación:** no hay evidencia de `vercel` ni `firebase deploy`; `/api/health` todavía no
+  se probó desde el teléfono.
+- **Decisión:** el commit de política y las correcciones de `.env`, tests y documentación
+  quedan pendientes de revisión y del commit/push del humano.
 
 ## 2026-11-14 · Caso corregido 4 — `.env` entre comillas
 - **Propósito:** que la evaluación por segmentos no pierda la detección de `.env` cuando la
