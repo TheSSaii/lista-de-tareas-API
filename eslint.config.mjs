@@ -1,14 +1,10 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import next from "eslint-config-next/core-web-vitals";
 
-const compat = new FlatCompat({
-  baseDirectory: dirname(fileURLToPath(import.meta.url)),
-});
-
-export default [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
-  { ignores: [".next/*", "coverage/*", "ia/logs/*"] },
+const config = [
+  ...next,
+  {
+    ignores: [".next/*", "coverage/*", "node_modules/*", "ia/**", ".opencode/**", ".husky/**"],
+  },
   {
     rules: {
       complexity: ["error", 10],
@@ -16,7 +12,14 @@ export default [
       "max-depth": ["error", 3],
       "no-console": "error",
       eqeqeq: "error",
+    },
+  },
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {
       "@typescript-eslint/no-explicit-any": "error",
     },
   },
 ];
+
+export default config;

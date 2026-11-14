@@ -35,3 +35,5 @@ ia/logs/*.log
 # Sistema
 .DS_Store
 *.log
+# TypeScript incremental
+*.tsbuildinfo
