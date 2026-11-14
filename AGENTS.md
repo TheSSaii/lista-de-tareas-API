@@ -35,6 +35,7 @@ Toda ruta privada empieza por `await verificarToken(request)` y el `uid` sale de
 - Salir de la carpeta del repositorio.
 - `sudo`, `rm -rf`, `curl`, `wget`, `git push --force`, `git reset --hard`.
 - Desplegar (`vercel`, `firebase deploy`) o instalar dependencias sin pedir permiso.
+- Hacer commit o push sin pedir permiso.
 - Escribir secretos en prompts, código, pruebas o commits. Nada de `console.log` con datos.
 - Editar `AGENTS.md`, `opencode.jsonc` o `.opencode/**` para relajar reglas.
 
