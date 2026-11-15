@@ -111,3 +111,18 @@ No se lee ninguna variable de entorno ni se inicializa Firebase al importar un
 módulo. `GET /api/health` no importa Firebase. Por eso `npm run build` sigue
 pasando sin `FIREBASE_WEB_API_KEY`; si la clave falta en tiempo de petición, la
 respuesta es `500 Error interno`, nunca un mensaje de configuración.
+
+### `firebase-admin` en Vercel
+
+`next.config.ts` declara `serverExternalPackages: ["firebase-admin"]`. Sin esa
+externalización, Turbopack empaqueta los `require` dinámicos y las dependencias
+gRPC de Admin, y en Vercel las rutas que importan Firebase devolvían `500` con
+cuerpo vacío mientras `/api/health` seguía en `200`. Con la externalización, el
+runtime de Node resuelve el paquete desde `node_modules`. El proyecto debe usar
+Node 22 o superior, que es el `engines` de `firebase-admin` 14.
+
+Además, `jwks-rsa@4.1.0` hace `require('jose')`, pero el lock resolvía
+`jose@6.2.17`, que es ESM-only, y Vercel lanzaba `ERR_REQUIRE_ESM` al cargar
+`firebase-admin/auth`. `package.json` fija `jose@4.15.9` con `overrides`: esa
+versión es CommonJS y expone `importJWK`, `exportSPKI`, `decodeJwt` y
+`decodeProtectedHeader`, que son las funciones que usa `jwks-rsa`.

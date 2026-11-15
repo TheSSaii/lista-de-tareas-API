@@ -33,24 +33,41 @@ Formato: propósito · evidencia · validación · decisión.
   `.opencode/plugins/guard/politica.mjs`, rama `ask` en `.opencode/plugins/guard/index.ts`,
   pruebas 17–23 de `ia/pruebas/politica.test.mjs` y `npm run check:ia` (23/23).
   En la revisión, `git log` local mostraba 6 commits y `git ls-remote` devolvía `06800a8`.
-  Después se publicaron `a4899ca` y `fd8a5e8` (política).
+  Después se publicaron `a4899ca` y `f79dafb` (política).
 - **Validación:** `git status && git commit` y `git add . && git push` devuelven `ask`;
   `git push --force` y `git reset --hard` encadenados siguen devolviendo `deny`; `git status`
   y `npm run check` siguen en `permitir`; un separador entre comillas
   (`echo "a; curl x"`) no parte el comando y `git commit -m "a; b"` sigue en `ask`.
 - **Decisión:** se pide permiso (`ask`), no se deniega; los `deny` de fuerza/reset se evalúan
-  antes. Los commits del bloque fueron autorizados por el humano; en la revisión no se había
-  hecho push y después se publicó `a4899ca`. No hay despliegue registrado.
+  antes. Los commits del bloque fueron autorizados por el humano; después se publicaron
+  `a4899ca` y `f79dafb`. No hay despliegue registrado.
 
-## 2026-11-14 · Publicación del bloque de autenticación
+## 2026-11-14 · Publicación del bloque de autenticación y de política
 - **Propósito:** registrar el estado remoto después de la revisión.
-- **Evidencia:** `git ls-remote origin refs/heads/main` devuelve `a4899ca`; al momento de este
-  registro, `main` local está en `fd8a5e8` (política, sin publicar) y solo `ia/BITACORA.md`
-  queda modificado.
-- **Validación:** no hay evidencia de `vercel` ni `firebase deploy`; `/api/health` todavía no
-  se probó desde el teléfono.
-- **Decisión:** el commit de política y las correcciones de `.env`, tests y documentación
-  quedan pendientes de revisión y del commit/push del humano.
+- **Evidencia:** `git ls-remote origin refs/heads/main` devuelve `f79dafb`; `main` local y
+  remoto coinciden y el árbol de trabajo está limpio.
+- **Validación:** `npm run check` (68/68), `npm run build` y `npm run check:ia` (23/23) en
+  verde. No hay evidencia de `vercel` ni `firebase deploy`; `/api/health` todavía no se probó
+  desde el teléfono.
+- **Decisión:** el bloque de auth/tareas y el arreglo de política están publicados. El
+  siguiente paso es el despliegue en Vercel y, después, `/api/tareas/resumen`.
+
+## 2026-11-15 · Corregido el 500 de las rutas Firebase en Vercel
+- **Propósito:** explicar por qué `/api/health` respondía `200` y `/api/auth/*` y
+  `/api/tareas` devolvían `500` con cuerpo vacío en producción.
+- **Evidencia:** las tres rutas que fallan comparten la importación de `firebase-admin`;
+  `/api/health` no la importa. El log de Vercel mostró `ERR_REQUIRE_ESM`: `jwks-rsa`
+  hace `require('jose')` y el lock resolvía `jose@6.2.17`, que es ESM-only. En local,
+  tras `next start` con `serverExternalPackages: ["firebase-admin"]`, `/api/tareas` sin
+  token responde `401` y registro/login con cuerpo vacío responden `400` de Zod.
+- **Validación:** `npm run check` (68/68), `npm run build` y `npm run check:ia` (23/23)
+  en verde. El lock quedó con `jwks-rsa/node_modules/jose` en `4.15.9`; la confirmación
+  final queda pendiente del redeploy en Vercel.
+- **Decisión:** externalizar `firebase-admin` en `next.config.ts`, fijar `jose@4.15.9`
+  con `overrides` (CommonJS, compatible con las funciones que usa `jwks-rsa`) y usar
+  Node 22 o superior en Vercel. No cambiar el contrato de las rutas. El problema no era
+  la Web API Key ni Firestore: era el empaquetado del Admin SDK y la resolución ESM de
+  `jose`.
 
 ## 2026-11-14 · Caso corregido 4 — `.env` entre comillas
 - **Propósito:** que la evaluación por segmentos no pierda la detección de `.env` cuando la
