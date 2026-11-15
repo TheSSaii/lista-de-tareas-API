@@ -1,5 +1,9 @@
 type Datos = Record<string, unknown>;
 
+type Operador = "==" | ">" | ">=" | "<";
+
+type Filtro = { campo: string; operador: Operador; valor: unknown };
+
 const colecciones = new Map<string, Map<string, Datos>>();
 
 function obtenerColeccion(uid: string): Map<string, Datos> {
@@ -9,6 +13,26 @@ function obtenerColeccion(uid: string): Map<string, Datos> {
   const nueva = new Map<string, Datos>();
   colecciones.set(uid, nueva);
   return nueva;
+}
+
+/**
+ * Solo replica lo que usan las primitivas: igualdad (`null`, booleanos, texto)
+ * y rangos lexicográficos sobre ISO 8601. Un `null` no entra en un rango, igual
+ * que en Firestore. No hay tipos Timestamp ni índices reales.
+ */
+function coincide(datos: Datos, filtro: Filtro): boolean {
+  const valor = datos[filtro.campo];
+
+  if (filtro.operador === "==") return valor === filtro.valor;
+  if (valor === null || valor === undefined) return false;
+
+  const izquierda = String(valor);
+  const derecha = String(filtro.valor);
+
+  if (filtro.operador === ">") return izquierda > derecha;
+  if (filtro.operador === ">=") return izquierda >= derecha;
+
+  return izquierda < derecha;
 }
 
 function crearDocumento(uid: string, id: string) {
@@ -25,12 +49,18 @@ function crearDocumento(uid: string, id: string) {
 }
 
 function crearColeccion(uid: string) {
-  let since: string | null = null;
+  const filtros: Filtro[] = [];
   let limite = Number.POSITIVE_INFINITY;
 
+  function seleccionar(): [string, Datos][] {
+    return [...obtenerColeccion(uid).entries()].filter(([, datos]) =>
+      filtros.every((filtro) => coincide(datos, filtro)),
+    );
+  }
+
   const consulta = {
-    where: (_campo: string, _operador: string, valor: string) => {
-      since = valor;
+    where: (campo: string, operador: Operador, valor: unknown) => {
+      filtros.push({ campo, operador, valor });
       return consulta;
     },
     orderBy: () => consulta,
@@ -39,14 +69,16 @@ function crearColeccion(uid: string) {
       return consulta;
     },
     get: async () => {
-      const documentos = [...obtenerColeccion(uid).entries()]
-        .filter(([, datos]) => since === null || String(datos.updated_at) > since)
+      const documentos = seleccionar()
         .sort((a, b) => String(a[1].updated_at).localeCompare(String(b[1].updated_at)))
         .slice(0, limite)
         .map(([id, datos]) => ({ id, exists: true, data: () => datos }));
 
       return { docs: documentos };
     },
+    count: () => ({
+      get: async () => ({ data: () => ({ count: seleccionar().length }) }),
+    }),
     doc: (id: string) => crearDocumento(uid, id),
   };
 

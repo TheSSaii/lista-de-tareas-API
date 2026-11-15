@@ -7,6 +7,7 @@ import {
   leerTareaFalsa,
   reiniciarTareasFalsas,
   sembrarTareaFalsa,
+  sembrarTareaLegada,
 } from "./ayuda/tareas-falsas";
 
 const sesion = vi.hoisted(() => ({ uid: "ana" as string | null }));
@@ -43,6 +44,7 @@ const tareaBase: TareaGuardada = {
   created_at: "2026-11-01T10:00:00.000Z",
   updated_at: "2026-11-01T10:00:00.000Z",
   deleted_at: null,
+  completada_en: null,
 };
 
 function contexto(id: string) {
@@ -239,5 +241,109 @@ describe("DELETE /api/tareas/[id]", () => {
     expect(respuesta.status).toBe(200);
     expect(await cuerpoJson(respuesta)).toEqual({ ok: true });
     expect(leerTareaFalsa("ana", "t1")?.deleted_at).toEqual(expect.any(String));
+  });
+});
+
+async function completar(id: string, completada: boolean): Promise<Record<string, unknown>> {
+  const respuesta = await PUT(
+    peticion("PUT", `http://localhost/api/tareas/${id}`, { ...camposBase, completada }),
+    contexto(id),
+  );
+
+  expect(respuesta.status).toBe(200);
+  return cuerpoJson(respuesta);
+}
+
+describe("completada_en: transiciones del servidor", () => {
+  beforeEach(() => {
+    sesion.uid = "ana";
+    reiniciarTareasFalsas();
+  });
+
+  it("sella completada_en al completar un documento nuevo", async () => {
+    const antes = Date.now();
+
+    const cuerpo = await completar("nueva", true);
+
+    expect(cuerpo.completada_en).toEqual(expect.any(String));
+    expect(Date.parse(String(cuerpo.completada_en))).toBeGreaterThanOrEqual(antes);
+  });
+
+  it("conserva completada_en al editar una tarea ya completada", async () => {
+    const primera = await completar("t1", true);
+
+    const segunda = await PUT(
+      peticion("PUT", "http://localhost/api/tareas/t1", {
+        ...camposBase,
+        titulo: "Otro título distinto",
+        completada: true,
+      }),
+      contexto("t1"),
+    );
+
+    expect((await cuerpoJson(segunda)).completada_en).toBe(primera.completada_en);
+  });
+
+  it("limpia completada_en al volver a false", async () => {
+    await completar("t1", true);
+
+    expect((await completar("t1", false)).completada_en).toBeNull();
+  });
+
+  it("ignora completada_en enviado por el cliente", async () => {
+    const respuesta = await PUT(
+      peticion("PUT", "http://localhost/api/tareas/t1", {
+        ...camposBase,
+        completada: true,
+        completada_en: "2020-01-01T00:00:00.000Z",
+      }),
+      contexto("t1"),
+    );
+
+    expect((await cuerpoJson(respuesta)).completada_en).not.toBe("2020-01-01T00:00:00.000Z");
+  });
+});
+
+describe("completada_en: legado, borrado y listado", () => {
+  beforeEach(() => {
+    sesion.uid = "ana";
+    reiniciarTareasFalsas();
+  });
+
+  it("usa el updated_at anterior para un documento legado completado sin sello", async () => {
+    sembrarTareaLegada("ana", "t1", {
+      ...camposBase,
+      completada: true,
+      created_at: "2026-10-01T10:00:00.000Z",
+      updated_at: "2026-11-01T10:00:00.000Z",
+      deleted_at: null,
+    });
+
+    expect((await completar("t1", true)).completada_en).toBe("2026-11-01T10:00:00.000Z");
+  });
+
+  it("conserva completada_en en el borrado lógico", async () => {
+    const creada = await completar("t1", true);
+
+    await DELETE(peticion("DELETE", "http://localhost/api/tareas/t1"), contexto("t1"));
+
+    expect(leerTareaFalsa("ana", "t1")?.completada_en).toBe(creada.completada_en);
+  });
+
+  it("GET /api/tareas devuelve completada_en, también en documentos legados", async () => {
+    sembrarTareaFalsa("ana", "con-sello", {
+      ...tareaBase,
+      completada: true,
+      completada_en: "2026-11-10T10:00:00.000Z",
+    });
+    sembrarTareaLegada("ana", "legado", { ...tareaBase, completada: true });
+
+    const cuerpo = await cuerpoJson(await GET(peticion("GET", "http://localhost/api/tareas")));
+    const sello = "2026-11-10T10:00:00.000Z";
+
+    expect(cuerpo.items).toEqual([
+      { id: "con-sello", ...tareaBase, completada: true, completada_en: sello },
+      { id: "legado", ...tareaBase, completada: true, completada_en: null },
+    ]);
   });
 });

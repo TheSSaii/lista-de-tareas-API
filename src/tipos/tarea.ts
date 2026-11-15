@@ -12,6 +12,7 @@ export type TareaGuardada = CamposTarea & {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  completada_en: string | null;
 };
 
 export type Tarea = TareaGuardada & {
@@ -26,4 +27,10 @@ export type DocumentoTarea = {
 export type ResultadoListaTareas = {
   items: Tarea[];
   servidor_ahora: string;
+};
+
+export type ResumenTareas = {
+  pendientes: number;
+  vencidas: number;
+  completadas_semana: number;
 };

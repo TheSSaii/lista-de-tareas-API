@@ -1,0 +1,23 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "tarea",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deleted_at", "order": "ASCENDING" },
+        { "fieldPath": "completada", "order": "ASCENDING" },
+        { "fieldPath": "vence_en", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tarea",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deleted_at", "order": "ASCENDING" },
+        { "fieldPath": "completada", "order": "ASCENDING" },
+        { "fieldPath": "completada_en", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

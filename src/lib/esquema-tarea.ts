@@ -25,6 +25,9 @@ export const esquemaTareaGuardada = esquemaTarea.extend({
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
   deleted_at: z.iso.datetime().nullable(),
+  // Lo pone el servidor. `default(null)` mantiene válidos los documentos
+  // anteriores a este campo, que no cuentan en la semana en curso.
+  completada_en: z.iso.datetime().nullable().default(null),
 });
 
 export const esquemaIdTarea = z

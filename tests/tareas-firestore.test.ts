@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   borrarDocumentoTarea,
+  contarCompletadasDesde,
+  contarPendientes,
+  contarVencidas,
   guardarDocumentoTarea,
   listarDocumentosTarea,
   obtenerDocumentoTarea,
@@ -22,7 +25,39 @@ const tarea: TareaGuardada = {
   created_at: "2026-11-01T10:00:00.000Z",
   updated_at: "2026-11-01T10:00:00.000Z",
   deleted_at: null,
+  completada_en: null,
 };
+
+const AHORA = "2026-11-15T12:00:00.000Z";
+const INICIO_SEMANA = "2026-11-09T00:00:00.000Z";
+
+function sembrarEscenario(): void {
+  sembrarDocumentoFalso("ana", "futura", { ...tarea, vence_en: "2026-12-01T00:00:00.000Z" });
+  sembrarDocumentoFalso("ana", "vencida", tarea);
+  sembrarDocumentoFalso("ana", "sin-fecha", { ...tarea, vence_en: null });
+  sembrarDocumentoFalso("ana", "semana", {
+    ...tarea,
+    completada: true,
+    completada_en: "2026-11-10T10:00:00.000Z",
+  });
+  sembrarDocumentoFalso("ana", "vieja", {
+    ...tarea,
+    completada: true,
+    completada_en: "2026-11-01T10:00:00.000Z",
+  });
+  sembrarDocumentoFalso("ana", "legado", { ...tarea, completada: true });
+  sembrarDocumentoFalso("ana", "borrada", {
+    ...tarea,
+    deleted_at: "2026-11-12T00:00:00.000Z",
+  });
+  sembrarDocumentoFalso("ana", "borrada-semana", {
+    ...tarea,
+    completada: true,
+    completada_en: "2026-11-10T10:00:00.000Z",
+    deleted_at: "2026-11-12T00:00:00.000Z",
+  });
+  sembrarDocumentoFalso("beto", "ajena", tarea);
+}
 
 describe("adaptador de Firestore", () => {
   beforeEach(() => {
@@ -56,5 +91,42 @@ describe("adaptador de Firestore", () => {
 
     expect(documento?.datos).toMatchObject({ deleted_at: "2026-11-02T00:00:00.000Z" });
     expect(await obtenerDocumentoTarea("beto", "t1")).toBeNull();
+  });
+});
+
+describe("conteos con count(): pendientes y vencidas", () => {
+  beforeEach(() => {
+    reiniciarFirestoreFalso();
+  });
+
+  it("cuenta pendientes excluyendo borrados y completadas", async () => {
+    sembrarEscenario();
+
+    expect(await contarPendientes("ana")).toBe(3);
+    expect(await contarPendientes("beto")).toBe(1);
+    expect(await contarPendientes("nadie")).toBe(0);
+  });
+
+  it("cuenta vencidas solo con vence_en anterior a ahora", async () => {
+    sembrarEscenario();
+
+    expect(await contarVencidas("ana", AHORA)).toBe(1);
+    expect(await contarVencidas("ana", "2020-01-01T00:00:00.000Z")).toBe(0);
+    expect(await contarVencidas("nadie", AHORA)).toBe(0);
+  });
+});
+
+describe("conteos con count(): completadas de la semana", () => {
+  beforeEach(() => {
+    reiniciarFirestoreFalso();
+  });
+
+  it("usa un límite inferior inclusivo", async () => {
+    sembrarEscenario();
+
+    expect(await contarCompletadasDesde("ana", INICIO_SEMANA)).toBe(1);
+    expect(await contarCompletadasDesde("ana", "2026-11-10T10:00:00.000Z")).toBe(1);
+    expect(await contarCompletadasDesde("ana", "2026-11-10T10:00:00.001Z")).toBe(0);
+    expect(await contarCompletadasDesde("nadie", INICIO_SEMANA)).toBe(0);
   });
 });
