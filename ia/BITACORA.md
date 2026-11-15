@@ -69,6 +69,36 @@ Formato: propósito · evidencia · validación · decisión.
   la Web API Key ni Firestore: era el empaquetado del Admin SDK y la resolución ESM de
   `jose`.
 
+## 2026-11-15 · Bloque de resumen de tareas
+
+- **Propósito:** exponer `GET /api/tareas/resumen` con tres conteos `count()` y un
+  sello de completado propio del servidor, sin usar `updated_at` como proxy.
+- **Evidencia:** `app/api/tareas/resumen/route.ts`, `src/lib/semana.ts`,
+  `src/lib/tareas-firestore.ts` (tres primitivas de conteo), `completada_en` en
+  `src/tipos/tarea.ts` y `src/lib/esquema-tarea.ts`, `firestore.indexes.json`,
+  `firebase.json`; `tests/semana.test.ts`, `tests/resumen-servicio.test.ts`,
+  `tests/resumen-rutas.test.ts`, `tests/resumen-sin-token.test.ts`,
+  `tests/indices.test.ts` y los casos nuevos de `tests/tareas-rutas.test.ts` y
+  `tests/tareas-firestore.test.ts`; `npm test` (106/106), `npm run check`,
+  `npm run test:coverage` y `npm run build` en verde.
+- **Validación:** prueba en rojo primero (17 fallos en 7 archivos). Cubre 401 sin
+  cabecera y con token no verificable, ceros, mezcla de conteos, aislamiento por
+  `uid`, borrado lógico excluido de las tres métricas, completada legada sin
+  sello, límites inclusivo de semana y exclusivo de vencidas, `completada_en`
+  false→true/true→true/true→false, cliente ignorado, legado con `updated_at`,
+  `DELETE` que conserva el sello, `GET /api/tareas` que devuelve el campo, 500
+  opaco, `no-store` y forma exacta de `firestore.indexes.json`.
+- **Decisión:** la semana empieza el lunes `00:00:00.000 UTC` con límite
+  inclusivo; en Colombia (UTC-5) el corte local es domingo a las 19:00. Una tarea
+  completada sin conexión se sella al sincronizar, no en el instante real.
+- **Decisión:** los índices compuestos se versionan en `firestore.indexes.json`
+  (`collectionGroup: tarea`, `queryScope: COLLECTION`) pero los crea el humano en
+  Firebase Console antes del deploy. No se ejecutó `firebase deploy`.
+- **Decisión:** quedan como deuda la colisión de `PUT/DELETE /api/tareas/resumen`
+  con `[id]`, el `vence_en` sin hora que vence a las 00:00 UTC y el backfill de
+  `completada_en` en tareas completadas antes de este bloque. La ruta no registra
+  logs: un índice ausente se investiga en las consolas, no en el código.
+
 ## 2026-11-14 · Caso corregido 4 — `.env` entre comillas
 - **Propósito:** que la evaluación por segmentos no pierda la detección de `.env` cuando la
   ruta va entre comillas.

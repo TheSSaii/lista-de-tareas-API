@@ -174,4 +174,26 @@ usuarios/{uid}/tarea/{TAREA_ID}
 ```
 
 Con `titulo`, `descripcion`, `prioridad`, `vence_en`, `completada`,
-`created_at`, `updated_at` y `deleted_at`. No debe aparecer `notificacion_id`.
+`created_at`, `updated_at`, `deleted_at` y `completada_en` (`null` mientras no
+esté completada). No debe aparecer `notificacion_id`.
+
+## 11. Resumen de tareas
+
+> Antes de probar este endpoint, crea los dos índices compuestos de
+> `firestore.indexes.json` en Firebase Console → Firestore → Índices. Sin ellos
+> la ruta responde `500` aunque el token sea válido.
+
+```bash
+# 200 con los tres conteos
+curl -sS "$API_URL/api/tareas/resumen" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# 401 sin token
+curl -sS -i "$API_URL/api/tareas/resumen"
+```
+
+Esperado: exactamente `{"pendientes":N,"vencidas":N,"completadas_semana":N}`,
+enteros `>= 0`, y `Cache-Control: no-store`. `pendientes` incluye las vencidas:
+no las restes. Para comprobar `completadas_semana` en vivo, completa una tarea
+con el paso 9 (Editar y completar) y repite la llamada; el número debe subir en
+uno. Si devuelve `500`, revisa que los índices estén en estado «Habilitado».

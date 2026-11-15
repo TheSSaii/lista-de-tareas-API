@@ -285,7 +285,9 @@
                   "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
                   "const b = pm.response.json();",
                   "pm.test(\"incluye la tarea\", () => pm.expect(b.items.some((t) => t.id === pm.collectionVariables.get(\"tareaId\"))).to.eql(true));",
-                  "pm.test(\"servidor_ahora\", () => pm.expect(b.servidor_ahora).to.be.a(\"string\"));"
+                  "pm.test(\"servidor_ahora\", () => pm.expect(b.servidor_ahora).to.be.a(\"string\"));",
+                  "const t = b.items.find((x) => x.id === pm.collectionVariables.get(\"tareaId\"));",
+                  "pm.test(\"incluye completada_en\", () => pm.expect(t).to.have.property(\"completada_en\"));"
                 ],
                 "type": "text/javascript"
               }
@@ -428,6 +430,39 @@
                 "exec": [
                   "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
                   "pm.test(\"ok true\", () => pm.expect(pm.response.json().ok).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 · Resumen de tareas",
+          "description": "Requiere los dos índices compuestos de firestore.indexes.json creados en Firebase Console. Después del paso 12 la tarea está borrada, así que solo se comprueba la forma y que los conteos sean enteros.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/tareas/resumen"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"no-store\", () => pm.expect(pm.response.headers.get(\"cache-control\")).to.eql(\"no-store\"));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"solo tres claves\", () => pm.expect(Object.keys(b).sort()).to.eql([\"completadas_semana\", \"pendientes\", \"vencidas\"]));",
+                  "pm.test(\"enteros no negativos\", () => {",
+                  "  for (const clave of [\"pendientes\", \"vencidas\", \"completadas_semana\"]) {",
+                  "    pm.expect(Number.isInteger(b[clave]) && b[clave] >= 0, clave).to.eql(true);",
+                  "  }",
+                  "});"
                 ],
                 "type": "text/javascript"
               }

@@ -26,6 +26,83 @@ cliente, la consulta puede omitir el segundo. El cliente debe repetir la
 sincronización con el último `updated_at` recibido y, en caso de empate, avanzar
 por bloques hasta recibir menos de 500 elementos.
 
+## Bloque de resumen de tareas
+
+### Contrato de `GET /api/tareas/resumen`
+
+`Authorization: Bearer <idToken>`. Sin cuerpo ni parámetros (los extra se
+ignoran). `200` con exactamente tres enteros `>= 0` y `Cache-Control: no-store`:
+
+| Campo | Filtros | Nota |
+|---|---|---|
+| `pendientes` | `deleted_at == null`, `completada == false` | **incluye** las vencidas |
+| `vencidas` | lo anterior y `vence_en < ahora` | subconjunto de `pendientes` |
+| `completadas_semana` | `deleted_at == null`, `completada == true`, `completada_en >= inicio de semana` | `completada_en: null` no cuenta |
+
+`401 { "error": "No autorizado" }` sin token o con token no verificable; `500
+{ "error": "Error interno" }` sin detalles. La ruta no escribe logs ni expone el
+motivo: si devuelve `500`, revisa primero que los índices estén «Habilitado» en
+Firebase Console y que el deployment tenga las variables de Firebase.
+
+### `completada_en`
+
+Campo del servidor. No está en `esquemaTarea`, así que el cliente no puede
+fijarlo ni limpiarlo; `esquemaTareaGuardada` lo declara con `default(null)` para
+que los documentos anteriores a este bloque sigan listándose.
+
+| Situación | Resultado |
+|---|---|
+| `completada: false` | `null` |
+| `false → true` | `ahora` |
+| `true → true` con sello | se conserva (editar no mueve la semana) |
+| `true → true` en documento legado sin sello | `updated_at` anterior |
+| `DELETE` | se conserva; `deleted_at` ya lo excluye del resumen |
+
+Consecuencia de sincronización: una tarea completada sin conexión se sella cuando
+la app sincroniza el `PUT`, no en el instante real en que se completó. El resumen
+usa el sello del servidor.
+
+### Inicio de semana
+
+Lunes `00:00:00.000 UTC`, límite inclusivo (`completada_en >= inicio`), en
+`src/lib/semana.ts`. No es «últimos 7 días». En Colombia (UTC-5) el corte local
+cae domingo a las 19:00. Un `vence_en` con formato `YYYY-MM-DD` se considera
+vencido desde las `00:00` UTC de ese día, porque ISO 8601 se compara como texto;
+el formulario de la app envía fecha y hora.
+
+### Consultas e índices
+
+Tres `count()` en paralelo, una por métrica, sin leer documentos. No hay
+instantánea común: los números pueden diferir entre sí bajo escrituras
+concurrentes. `pendientes` solo usa igualdades; las otras dos necesitan índices
+compuestos, declarados en `firestore.indexes.json`:
+
+| Índice | `collectionGroup` | Campos |
+|---|---|---|
+| vencidas | `tarea` | `deleted_at ASC`, `completada ASC`, `vence_en ASC` |
+| completadas_semana | `tarea` | `deleted_at ASC`, `completada ASC`, `completada_en ASC` |
+
+Ambos con `queryScope: COLLECTION`. **Crear los índices antes de desplegar la
+ruta**: sin ellos Firestore devuelve `FAILED_PRECONDITION` y la API responde 500.
+Enlace: `https://console.firebase.google.com/project/<FIREBASE_PROJECT_ID>/firestore/indexes`
+(`<FIREBASE_PROJECT_ID>` está en Vercel → Settings → Environment Variables; no se
+versiona). `firebase.json` solo declara la ruta del archivo de índices; este
+bloque no ejecuta `firebase deploy`.
+
+### Deuda conocida: colisión con `[id]`
+
+`GET /api/tareas/resumen` resuelve bien porque el segmento estático tiene
+prioridad sobre el dinámico. Pero `PUT` y `DELETE /api/tareas/resumen` caen en
+`app/api/tareas/[id]/route.ts` y `esquemaIdTarea` acepta `resumen` como id, así
+que un cliente equivocado crearía la tarea `resumen`. Queda como deuda: reservar
+el slug o exigir UUID en `esquemaIdTarea`. No se cambia el contrato en este
+bloque.
+
+### Compatibilidad con la app
+
+`GET /api/tareas` ahora devuelve `completada_en` en cada item. La app debe
+ignorar el campo o migrarlo a SQLite; no debe enviarlo en el `PUT`.
+
 ## Bloque de autenticación
 
 ### Contrato
